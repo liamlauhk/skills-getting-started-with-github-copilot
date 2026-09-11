@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -25,7 +26,56 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <h5>Participants</h5>
+            <ul>
+              ${details.participants.length
+                ? details.participants
+                    .map(
+                      (participant) => `
+                        <li>
+                          <span>${participant}</span>
+                          <button
+                            type="button"
+                            class="remove-participant"
+                            data-activity="${encodeURIComponent(name)}"
+                            data-email="${encodeURIComponent(participant)}"
+                            title="Remove ${participant}"
+                            aria-label="Remove ${participant}"
+                          >&#128465;</button>
+                        </li>`
+                    )
+                    .join("")
+                : "<li class=\"no-participants\">No participants yet</li>"}
+            </ul>
+          </div>
         `;
+
+        activityCard.querySelectorAll(".remove-participant").forEach((button) => {
+          button.addEventListener("click", async (event) => {
+            const clickedButton = event.currentTarget;
+            clickedButton.disabled = true;
+
+            try {
+              const response = await fetch(
+                `/activities/${clickedButton.dataset.activity}/participants/${clickedButton.dataset.email}`,
+                { method: "DELETE" }
+              );
+              const result = await response.json();
+
+              if (!response.ok) {
+                throw new Error(result.detail || "Unable to remove participant");
+              }
+
+              await fetchActivities();
+            } catch (error) {
+              clickedButton.disabled = false;
+              messageDiv.textContent = error.message;
+              messageDiv.className = "error";
+              messageDiv.classList.remove("hidden");
+            }
+          });
+        });
 
         activitiesList.appendChild(activityCard);
 
@@ -62,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
